@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "x-django-paranoid"
+version = "0.1.0"
+description = "Production-grade soft-delete for Django - improved fork of django-paranoid with uniqueness, cascade tracing, and admin/DRF support"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "x-django-paranoid contributors"}]
+keywords = ["django", "soft-delete", "paranoid", "deleted_at"]
+requires-python = ">=3.9"
+dependencies = ["Django>=3.2"]
+classifiers = [
+  "Framework :: Django",
+  "Framework :: Django :: 3.2",
+  "Framework :: Django :: 4.2",
+  "Framework :: Django :: 5.0",
+  "Framework :: Django :: 6.0",
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/x-django-paranoid"
+Repository = "https://github.com/your-org/x-django-paranoid"
+
+[tool.setuptools.packages.find]
+include = ["x_paranoid*"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "tests.settings"
+pythonpath = ["."]
+
+[dependency-groups]
+dev = ["pytest", "pytest-django"]

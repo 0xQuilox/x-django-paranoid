@@ -1,0 +1,14 @@
+from setuptools import setup
+excluded = ['manage.py, tests/settings.py']
+
+setup(name="x-django-paranoid",
+       version="0.1.0",
+       description="Production-grade soft-delete for Django - improved fork of django-paranoid",
+       long_description=open('README.md', 'r').read() if __import__('os').path.exists('README.md') else '',
+       long_description_content_type='text/markdown',
+       author="x-django-paranoid contributors",
+       url="https://github.com/your-org/x-django-paranoid",
+       license="MIT",
+       packages=["x_paranoid"],
+       keywords="django created_at updated_at deleted_at fields models django-admin soft delete softdelete paranoid",
+       )
