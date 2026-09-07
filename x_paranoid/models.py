@@ -1,4 +1,5 @@
 from django.db import models
+from django.db import transaction
 from django.utils.timezone import now
 import uuid
 
@@ -24,7 +25,6 @@ class XParanoidQuerySet(models.QuerySet):
         return self.filter(deleted_at__isnull=True)
 
 
-
 class XParanoidManager(models.Manager.from_queryset(XParanoidQuerySet)):
     def get_queryset(self):
         return super().get_queryset().filter(deleted_at__isnull=True)
@@ -33,29 +33,44 @@ class XParanoidManager(models.Manager.from_queryset(XParanoidQuerySet)):
 class XParanoidManagerWithDeleted(models.Manager.from_queryset(XParanoidQuerySet)):
     pass
 
+
 class XParanoidModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(blank=True, null=True, default=None, db_index=True)
     deletion_batch_id = models.UUIDField(null=True, blank=True, db_index=True)
-    objects = XParanoidManager()  
-    objects_with_deleted = XParanoidManagerWithDeleted()  
+    objects = XParanoidManager()
+    objects_with_deleted = XParanoidManagerWithDeleted()
 
     class Meta:
         abstract = True
 
     class XParanoidMeta:
-        on_restore_conflict = 'RAISE_ERROR'  
+        on_restore_conflict = 'RAISE_ERROR'
         rename_template = "{value}-restored-{id}"
         auto_hard_delete_after = None
 
-    def delete(self, hard=False, **kwargs):
-        from django.db import transaction
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        parent_opts = getattr(XParanoidModel.XParanoidMeta, '__dict__', {})
+        child_meta = getattr(cls, 'XParanoidMeta', None)
+        if child_meta is XParanoidModel.XParanoidMeta:
+            return
+        if not hasattr(cls, 'XParanoidMeta') or child_meta is None:
+            cls.XParanoidMeta = type('XParanoidMeta', (), dict(parent_opts))
+        else:
+            for k, v in parent_opts.items():
+                if k.startswith('_'):
+                    continue
+                if not hasattr(child_meta, k):
+                    setattr(child_meta, k, v)
+
+    def delete(self, hard=False, batch_id=None, **kwargs):
         if hard:
             return super().delete(**kwargs)
         if self.deleted_at is not None:
-            return  
-        batch_id = uuid.uuid4()
+            return
+        batch_id = batch_id or uuid.uuid4()
         with transaction.atomic():
             self.deleted_at = now()
             self.deletion_batch_id = batch_id
@@ -65,9 +80,8 @@ class XParanoidModel(models.Model):
                 if not issubclass(related_model, XParanoidModel):
                     continue
                 fk_name = rel.field.name
-                related_model.objects.filter(**{fk_name: self.pk}).update(
-                    deleted_at=now(), deletion_batch_id=batch_id
-                )
+                for child in related_model.objects.filter(**{fk_name: self.pk}):
+                    child.delete(batch_id=batch_id)
 
     def hard_delete(self, **kwargs):
         return super().delete(**kwargs)
@@ -128,18 +142,17 @@ class XParanoidModel(models.Model):
         self.deletion_batch_id = None
         update_fields = ["deleted_at", "updated_at", "deletion_batch_id"] + renamed_fields
         self.save(update_fields=update_fields)
-        
         if batch_id:
-            from django.db import transaction
             with transaction.atomic():
                 for rel in self._meta.related_objects:
                     related_model = rel.related_model
                     if not issubclass(related_model, XParanoidModel):
                         continue
                     fk_name = rel.field.name
-                    related_model.objects_with_deleted.filter(
+                    for child in related_model.objects_with_deleted.filter(
                         **{fk_name: self.pk, "deletion_batch_id": batch_id}
-                    ).update(deleted_at=None, deletion_batch_id=None)
+                    ):
+                        child.restore()
 
     @property
     def is_deleted(self):

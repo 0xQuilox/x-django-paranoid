@@ -8,7 +8,7 @@ version = "0.2.0"
 description = "Production-grade soft-delete for Django - improved version of djang-paranoid with uniqueness, cascade tracing, and admin/DRF support"
 readme = "README.md"
 license = {text = "MIT"}
-authors = [{name = "x-django-paranoid contributors"}]
+authors = [{name = "0xQuilox"}]
 keywords = ["django", "soft-delete", "paranoid", "deleted_at"]
 requires-python = ">=3.9"
 dependencies = ["Django>=3.2"]
