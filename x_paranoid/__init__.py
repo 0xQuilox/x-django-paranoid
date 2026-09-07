@@ -1,13 +1,10 @@
-"""x-django-paranoid package."""
-
-# Lazy re-exports to avoid AppRegistryNotReady during Django setup.
-# Use: from x_paranoid.models import XParanoidModel  (preferred)
-# or:  from x_paranoid import XParanoidModel  (also works after apps ready)
-
 def __getattr__(name):
-    if name in {"ParanoidModel", "XParanoidModel", "ParanoidModelManager", "XParanoidManager", "XParanoidQuerySet", "ParanoidQuerySet"}:
+    if name in {"XParanoidModel", "XParanoidManager", "XParanoidQuerySet", "ParanoidUniqueConstraint", "XParanoidUniqueConstraint"}:
         from . import models as _models
-        return getattr(_models, name)
+        from . import constraints as _constraints
+        if hasattr(_models, name):
+            return getattr(_models, name)
+        return getattr(_constraints, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-__all__ = ["ParanoidModel", "ParanoidModelManager", "XParanoidModel", "XParanoidQuerySet", "XParanoidManager", "ParanoidQuerySet"]
+__all__ = ["XParanoidModel", "XParanoidManager", "XParanoidQuerySet", "ParanoidUniqueConstraint", "XParanoidUniqueConstraint"]
