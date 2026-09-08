@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "x-django-paranoid"
 version = "0.2.0"
-description = "Production-grade soft-delete for Django - improved version of djang-paranoid with uniqueness, cascade tracing, and admin/DRF support"
+description = "Production-grade soft-delete for Django - improved version of django-paranoid with uniqueness, cascade tracing, and admin/DRF support"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "0xQuilox"}]
@@ -23,8 +23,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/x-django-paranoid"
-Repository = "https://github.com/your-org/x-django-paranoid"
+Homepage = "https://github.com/0xquilox/x-django-paranoid"
+Repository = "https://github.com/0xquilox/x-django-paranoid"
 
 [tool.setuptools.packages.find]
 include = ["x_paranoid*"]
