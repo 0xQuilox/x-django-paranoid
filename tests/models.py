@@ -1,5 +1,6 @@
 from x_paranoid.constraints import ParanoidUniqueConstraint
 from x_paranoid.models import XParanoidModel
+from x_paranoid.fields import XParanoidForeignKey
 from django.db import models
 
 
@@ -24,8 +25,7 @@ class Author(XParanoidModel):
 
 class Book(XParanoidModel):
     title = models.CharField(max_length=50)
-    author = models.ForeignKey(Author, on_delete=models.CASCADE, related_name="books")
-
+    author = XParanoidForeignKey(Author, on_delete=models.CASCADE, related_name="books", null=True)
 
 # 6.2 XParanoidMeta inheritance demo
 class Base(XParanoidModel):

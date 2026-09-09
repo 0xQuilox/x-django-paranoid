@@ -3,13 +3,26 @@ from django.utils.timezone import now
 from datetime import timedelta
 from x_paranoid.models import XParanoidModel
 
+
+def _all_paranoid_models():
+    seen = set()
+    stack = list(XParanoidModel.__subclasses__())
+    while stack:
+        m = stack.pop()
+        if m in seen:
+            continue
+        seen.add(m)
+        stack.extend(m.__subclasses__())
+        if not getattr(m._meta, "abstract", False):
+            yield m
+
 class Command(BaseCommand):
     help = "Hard-delete soft-deleted rows older than TTL"
     def add_arguments(self, parser):
         parser.add_argument('--dry-run', action='store_true')
         parser.add_argument('--days', type=int, default=None)
     def handle(self, *args, **opts):
-        for model in XParanoidModel.__subclasses__():
+        for model in _all_paranoid_models():
             ttl = getattr(getattr(model,'XParanoidMeta',None),'auto_hard_delete_after', None)
             if opts['days'] is not None: ttl = timedelta(days=opts['days'])
             if ttl is None: continue

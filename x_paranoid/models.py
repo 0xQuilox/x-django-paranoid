@@ -1,23 +1,34 @@
 from django.db import models
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils.timezone import now
+from x_paranoid.signals import pre_soft_delete, post_soft_delete, pre_restore, post_restore
 import uuid
 
 
 class XParanoidQuerySet(models.QuerySet):
 
+
     def delete(self, hard=False, batch_id=None):
         if hard:
             return super().delete()
         batch = batch_id or uuid.uuid4()
-        return self.update(deleted_at=now(), deletion_batch_id=batch)
+        with transaction.atomic():
+            objs = list(self)
+            for obj in objs:
+                obj.delete(batch_id=batch)
+            return len(objs)
 
     def hard_delete(self):
         return super().delete()
 
     def restore(self):
-        return self.update(deleted_at=None, deletion_batch_id=None)
-
+        with transaction.atomic():
+            objs = list(self)
+            for obj in objs:
+                obj.restore()
+            return len(objs)
+    
     def deleted(self):
         return self.filter(deleted_at__isnull=False)
 
@@ -66,6 +77,7 @@ class XParanoidModel(models.Model):
                     setattr(child_meta, k, v)
 
     def delete(self, hard=False, batch_id=None, **kwargs):
+        pre_soft_delete.send(sender=self.__class__, instance=self, batch_id=batch_id)
         if hard:
             return super().delete(**kwargs)
         if self.deleted_at is not None:
@@ -80,8 +92,17 @@ class XParanoidModel(models.Model):
                 if not issubclass(related_model, XParanoidModel):
                     continue
                 fk_name = rel.field.name
-                for child in related_model.objects.filter(**{fk_name: self.pk}):
-                    child.delete(batch_id=batch_id)
+                policy = getattr(rel.field, "paranoid_on_delete", "CASCADE")
+                fk_name = rel.field.name
+                if policy == "PROTECT":
+                    if related_model.objects.filter(**{fk_name: self.pk}).exists():
+                        raise models.ProtectedError(f"Cannot soft-delete {self} because {related_model.__name__} still refers to it.", related_model.objects.filter(**{fk_name: self.pk}),)
+                elif policy == "SET_NULL":
+                    related_model.objects.filter(**{fk_name: self.pk}).update(**{fk_name: None})
+                else:
+                    for child in related_model.objects.filter(**{fk_name: self.pk}):
+                        child.delete(batch_id=batch_id)
+        post_soft_delete.send(sender=self.__class__, instance=self, batch_id=batch_id)
 
     def hard_delete(self, **kwargs):
         return super().delete(**kwargs)
@@ -108,6 +129,8 @@ class XParanoidModel(models.Model):
     def restore(self):
         if self.deleted_at is None:
             return
+        batch_id = self.deletion_batch_id
+        pre_restore.send(sender=self.__class__, instance=self, batch_id=batch_id)
         qs = self._get_unique_conflict_qs()
         renamed_fields = []
         if qs.exists():
@@ -137,7 +160,6 @@ class XParanoidModel(models.Model):
                                     renamed_fields.append(fname)
             elif policy == 'OVERWRITE_ACTIVE':
                 qs.hard_delete()
-        batch_id = self.deletion_batch_id
         self.deleted_at = None
         self.deletion_batch_id = None
         update_fields = ["deleted_at", "updated_at", "deletion_batch_id"] + renamed_fields
@@ -153,6 +175,7 @@ class XParanoidModel(models.Model):
                         **{fk_name: self.pk, "deletion_batch_id": batch_id}
                     ):
                         child.restore()
+        post_restore.send(sender=self.__class__, instance=self, batch_id=batch_id)
 
     @property
     def is_deleted(self):

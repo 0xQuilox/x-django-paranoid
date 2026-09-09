@@ -29,4 +29,10 @@ class XParanoidSerializerMixin:
                     message=field.error_messages.get('unique', 'Already exists (active).')
                 )
             )
+        
+        self.validators = [
+            v for v in getattr(self, 'validators', [])
+            if not isinstance(v, UniqueTogetherValidator)
+            ]
+            
         return fields

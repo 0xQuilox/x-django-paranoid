@@ -2,7 +2,7 @@ from django.core import checks
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import models
 from django.db.models.fields.related_descriptors import ForwardManyToOneDescriptor
-
+from django.apps import apps as django_apps
 
 class ObjectSoftDeleted(ObjectDoesNotExist):
     pass
@@ -30,10 +30,10 @@ class SoftDeletedForwardManyToOneDescriptor(ForwardManyToOneDescriptor):
 class XParanoidForeignKey(models.ForeignKey):
     forward_related_accessor_class = SoftDeletedForwardManyToOneDescriptor
 
-    def __init__(self, *args, raise_on_deleted=False, **kwargs):
+    def __init__(self, *args, raise_on_deleted=False, paranoid_on_delete="CASCADE", **kwargs):
         self.raise_on_deleted = raise_on_deleted
+        self.paranoid_on_delete = paranoid_on_delete
         super().__init__(*args, **kwargs)
-
 
 class XParanoidManyToManyField(models.ManyToManyField):
 
@@ -42,15 +42,14 @@ class XParanoidManyToManyField(models.ManyToManyField):
         through = self.remote_field.through
 
         if getattr(through, '_meta', None) and through._meta.auto_created:
+            errors.append(checks.Warning(f"ManyToManyField '{self.name}' uses auto-created through '{through.__name__}' which hard-deletes. Define explicit through=XParanoidModel.", obj=self, id="x_paranoid.W002",))
             return errors
 
         if isinstance(through, str):
             try:
-                from django.apps import apps
-                through = apps.get_model(through, require_ready=False)
-            except Exception:
-                return errors
-
+                through = django_apps.get_model(through, require_ready=False)
+            except (LookupError, ValueError, ImportError):
+                    return errors
         if through is not None and hasattr(through, '__mro__'):
             is_paranoid = any(base.__name__ == 'XParanoidModel' for base in through.__mro__)
             if not is_paranoid:
