@@ -49,7 +49,7 @@ class XParanoidManyToManyField(models.ManyToManyField):
             try:
                 through = django_apps.get_model(through, require_ready=False)
             except (LookupError, ValueError, ImportError):
-                    return errors
+                return errors
         if through is not None and hasattr(through, '__mro__'):
             is_paranoid = any(base.__name__ == 'XParanoidModel' for base in through.__mro__)
             if not is_paranoid:

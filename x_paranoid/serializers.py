@@ -1,5 +1,4 @@
-from rest_framework.validators import UniqueValidator
-from django.db.models import Q
+from rest_framework.validators import UniqueValidator, UniqueTogetherValidator
 
 class XParanoidSerializerMixin:
     

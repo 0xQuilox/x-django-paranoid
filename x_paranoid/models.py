@@ -1,6 +1,5 @@
 from django.db import models
 from django.db import transaction
-from django.db.models import ProtectedError
 from django.utils.timezone import now
 from x_paranoid.signals import pre_soft_delete, post_soft_delete, pre_restore, post_restore
 import uuid
@@ -77,12 +76,12 @@ class XParanoidModel(models.Model):
                     setattr(child_meta, k, v)
 
     def delete(self, hard=False, batch_id=None, **kwargs):
-        pre_soft_delete.send(sender=self.__class__, instance=self, batch_id=batch_id)
         if hard:
             return super().delete(**kwargs)
         if self.deleted_at is not None:
             return
         batch_id = batch_id or uuid.uuid4()
+        pre_soft_delete.send(sender=self.__class__, instance=self, batch_id=batch_id)
         with transaction.atomic():
             self.deleted_at = now()
             self.deletion_batch_id = batch_id
@@ -93,7 +92,6 @@ class XParanoidModel(models.Model):
                     continue
                 fk_name = rel.field.name
                 policy = getattr(rel.field, "paranoid_on_delete", "CASCADE")
-                fk_name = rel.field.name
                 if policy == "PROTECT":
                     if related_model.objects.filter(**{fk_name: self.pk}).exists():
                         raise models.ProtectedError(f"Cannot soft-delete {self} because {related_model.__name__} still refers to it.", related_model.objects.filter(**{fk_name: self.pk}),)
