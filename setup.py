@@ -2,7 +2,7 @@ from setuptools import setup
 excluded = ['manage.py, tests/settings.py']
 
 setup(name="x-django-paranoid",
-       version="0.2.0",
+       version="0.3.0",
        description="Production-grade soft-delete for Django - improved version of django-paranoid",
        long_description=open('README.md', 'r').read() if __import__('os').path.exists('README.md') else '',
        long_description_content_type='text/markdown',

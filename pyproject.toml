@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "x-django-paranoid"
-version = "0.2.0"
+version = "0.3.0"
 description = "Production-grade soft-delete for Django - improved version of django-paranoid with uniqueness, cascade tracing, and admin/DRF support"
 readme = "README.md"
 license = {text = "MIT"}

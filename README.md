@@ -168,6 +168,17 @@ We stamp a `deletion_batch_id` (UUID) on every row deleted together. Restoring o
 
 For deep trees (`Author → Article → Comment`) it recurses automatically — same batch flows to grandchildren.
 
+Bulk works too — `Author.objects.filter(...).delete()` / `.restore()` loop per-instance with a shared batch (v0.3.0+), so children cascade the same as `author.delete()`.
+
+Per-FK policy (v0.3.0+):
+
+```python
+author = XParanoidForeignKey(Author, on_delete=models.CASCADE, paranoid_on_delete="CASCADE")
+# "CASCADE" (default) — soft-delete children
+# "PROTECT" — raise ProtectedError if active children exist
+# "SET_NULL" — nullify fk instead of deleting (requires null=True)
+```
+
 ### 4. Safe foreign keys
 
 ```python
@@ -200,7 +211,7 @@ BookCategory.objects.create(book=book, category=cat)
 BookCategory.objects.filter(book=book, category=cat).delete()  # soft
 ```
 
-The `XParanoidManyToManyField` marker will warn you (`W001`) if your `through` model doesn't inherit `XParanoidModel`.
+The `XParanoidManyToManyField` marker will warn you (`W001`) if your `through` model doesn't inherit `XParanoidModel`. Auto-created `through` (no explicit `through=...`) warns `W002` — define an explicit `through=XParanoidModel` to get soft-deletable junctions.
 
 ---
 
@@ -232,6 +243,18 @@ class ArticleSerializer(XParanoidSerializerMixin, serializers.ModelSerializer):
         model = Article
         fields = ["id", "slug", "title"]
 ```
+
+Re-scopes `UniqueValidator` to active rows (`objects.all()`) and strips default `UniqueTogetherValidator` (active-only together needs custom `validate()`).
+
+## Signals
+
+```python
+from x_paranoid.signals import pre_soft_delete, post_soft_delete, pre_restore, post_restore
+
+post_soft_delete.connect(lambda sender, instance, batch_id, **kw: print(f"deleted {instance.pk}"))
+```
+
+Sent with `sender, instance, batch_id`. `post_*` fires after the atomic block. Use for cache invalidation / audit; `deleted_by` history is still app-side.
 
 **ViewSet** — trash-bin endpoints out of the box:
 
@@ -268,6 +291,8 @@ python manage.py purge_soft_deleted --days 30
 
 # add to cron / celery beat
 ```
+
+Purge walks all paranoid models recursively (including indirect subclasses like `Child(Base)`) via `_all_paranoid_models()`.
 
 ---
 
